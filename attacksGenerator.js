@@ -29,9 +29,11 @@ const bake = state => (
 );
 
 class FightSim {
-    constructor(myField, enemyField) {
+    constructor(myField, enemyField, myHp = 10, enemyHp = 10) {
         this.myField = myField;
         this.enemyField = enemyField;
+        this.myHp = myHp;
+        this.enemyHp = enemyHp;
 
         this.plans = [];
         this.stateCache = {};
@@ -78,14 +80,8 @@ class FightSim {
         this.enemyDefenders = this.enemyField.filter(isDefender);
 
         const state = {
-            // enemyAttacks: enemyField.map(c => c.attack),
-            // myDefense: myField.map(c => c.defense),
-            // enemyDefense: enemyField.map(c => c.defense),
-            // enemyDefender: enemyField.map(c => isDefender(c)),
-            // myDeathtouch: myField.map(c => isDeathtouch(c)),
-            // enemyDeathtouch: myField.map(c => isDeathtouch(c)),
-            myHp: 10,
-            enemyHp: 10,
+            myHp: this.myHp,
+            enemyHp: this.enemyHp,
             
             my: [...this.myField],
             enemy: [...this.enemyField],
@@ -189,7 +185,7 @@ class FightSim {
                     return newState;
                 }
 
-                const excessDamage = isTrample(attacker) ? Math.max(attacker.attack - target.defense, 0) : 0;
+                const excessDamage = (isTrample(attacker) && !isWard(target)) ? Math.max(attacker.attack - target.defense, 0) : 0;
                 var targetHp = isDeathtouch(attacker) ? 0 : target.defense - attacker.attack;
                 if (isWard(target)) {
                     targetHp = target.defense;
