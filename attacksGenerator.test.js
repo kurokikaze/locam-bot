@@ -1,8 +1,8 @@
 const {
-    generateAttacks,
     FightSim,
     alive,
     evaluateState,
+    abilitiesIntersect,
 } = require('./attacksGenerator');
 
 const card = (pt, abilities) => {
@@ -196,8 +196,44 @@ describe('Graph tests', () => {
 
         sim.prunePlans();
 
-        expect(sim.plans.length).toEqual(16);
+        expect(sim.plans.length).toEqual(13);
     });
+
+
+    it('вынос атакующих вместо атаки в игрока', () => {
+        const myField = [card('1/1')];
+        const enemyField = [card('3/1')];
+        const sim = new FightSim(myField, enemyField, 10, 10);
+        const chargeState = bake(sim.simulateFight('0'));
+
+        const chargeValue = evaluateState(chargeState);
+
+        // expect(chargeValue).toEqual(-1.1999999999999993);
+
+        const attackState = bake(sim.simulateFight('1'));
+        // console.debug(attackState);
+        const attackValue = evaluateState(attackState);
+
+        expect(attackValue).toEqual(0);
+
+        expect(attackValue).toBeGreaterThan(chargeValue);
+    });
+
+    it('правильно определяет пересечение свойств', () => {
+        const c1 = {
+            abilities: '.ABC..',
+        };
+        const c2 = {
+            abilities: '...CDE',
+        };
+        const c3 = {
+            abilities: 'N...DE',
+        }
+
+        expect(abilitiesIntersect(c1)(c2)).toEqual(true);
+        expect(abilitiesIntersect(c2)(c3)).toEqual(true);
+        expect(abilitiesIntersect(c1)(c3)).toEqual(false);
+    })
 
     it('прунинг планов учитывает всех защитников', () => {
         const myField = [card('2/1'), card('1/1'), card('1/2')];
@@ -208,7 +244,7 @@ describe('Graph tests', () => {
 
         sim.prunePlans();
 
-        expect(sim.plans.length).toEqual(32);
+        expect(sim.plans.length).toEqual(24);
     });
 
     it('долгий расчёт', () => {

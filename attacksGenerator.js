@@ -12,12 +12,6 @@ function pad(n, width, z) {
   return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
 }
 
-const generateAttacks = (myUnits, enemyUnits) => {
-    const base = enemyUnits + 1;
-    const number = parseInt(Array(myUnits).fill(base - 1).join(''), base);
-    return Array(number).fill(1).map((el, i) => pad(i.toString(base), myUnits));
-}
-
 const alive = c => c.defense > 0;
 
 const bake = state => (
@@ -27,6 +21,15 @@ const bake = state => (
         enemy: state.enemy.filter(alive),
     }
 );
+
+function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}
 
 class FightSim {
     constructor(myField, enemyField, myHp = 10, enemyHp = 10) {
@@ -49,8 +52,9 @@ class FightSim {
     }
 
     printState() {
-        console.log(`Steps simulated: ${this.stepsSimulated}`);
-        console.log(`Cached states: ${Object.keys(this.stateCache).length}`);
+        const log = console ? console.log : printErr;
+        log(`Steps simulated: ${this.stepsSimulated}`);
+        log(`Cached states: ${Object.keys(this.stateCache).length}`);
     }
 
     generateAttacks() {
@@ -69,10 +73,19 @@ class FightSim {
         });
 
         if (defenderPositions.size > 0) {
-            this.plans = this.plans.filter(plan => defenderPositions.has(plan.slice(0, 1)));
+            const defLine = [ ...defenderPositions].join('');
+            const tester = new RegExp(`[^${defLine}][${defLine}]`);
+
+            this.plans = this.plans
+                .filter(plan => defenderPositions.has(plan.slice(0, 1)))
+                .filter(plan => !tester.test(plan));
         }
     }
 
+    shufflePlans() {
+        shuffleArray(this.plans);
+    }
+    
     simulateFight(plan) {
         const planSteps = plan.split('');
 
@@ -185,16 +198,25 @@ class FightSim {
                     return newState;
                 }
 
-                const excessDamage = (isTrample(attacker) && !isWard(target)) ? Math.max(attacker.attack - target.defense, 0) : 0;
-                var targetHp = isDeathtouch(attacker) ? 0 : target.defense - attacker.attack;
+                var damageDealt = attacker.attack;
+
                 if (isWard(target)) {
-                    targetHp = target.defense;
+                    damageDealt = 0;
                 }
+
+                const excessDamage = isTrample(attacker) ? Math.max(damageDealt - target.defense, 0) : 0;
+                const targetHp = (isDeathtouch(attacker) && damageDealt > 0) ? 0 : target.defense - damageDealt;
+
+                var damageDealtToUs = target.attack;
                 
-                var attackerHp = isDeathtouch(target) ? 0 : attacker.defense - target.attack;
                 if (isWard(attacker)) {
-                    attackerHp = attacker.defense;
+                    damageDealt = 0;
                 }
+
+                const excessDamageToUs = isTrample(target) ? Math.max(damageDealtToUs - attacker.defense, 0) : 0;
+                const attackerHp = (isDeathtouch(target) && damageDealtToUs > 0) ? 0 : attacker.defense - damageDealtToUs;
+
+                // var attackerHp = isDeathtouch(target) ? 0 : attacker.defense - target.attack;
 
                 const newState = {
                     ...state,
@@ -202,7 +224,7 @@ class FightSim {
                         ...state.my.slice(0, i),
                         {
                             ...attacker,
-                            defense: isDeathtouch(target) ? 0 : attacker.defense - target.attack,
+                            defense: attackerHp,
                             abilities: (target.attack > 0) ? attacker.abilities.replace(/W/g, '.') : attacker.abilities,
                         },
                         ...state.my.slice(i + 1),
@@ -233,19 +255,27 @@ class FightSim {
     }
 }
 
+const hpPointWeight = 1.8;
+const defensePointWeight = 0.5;
+
 const evaluateState = state => {
-    const ratingFormula = (acc, c) => (acc + parseInt(c.attack, 10) + parseInt(c.defense, 10) / 2);
-    const myUnitsRating = state.my.reduce(ratingFormula, state.myHp * 5);
-    const enemyUnitsRating = state.enemy.reduce(ratingFormula, state.enemyHp * 5);
-    
+    const ratingFormula = (acc, c) => (acc + c.attack + c.defense * defensePointWeight);
+    const myUnitsRating = state.my.reduce(ratingFormula, state.myHp * hpPointWeight);
+    const enemyUnitsRating = state.enemy.reduce(ratingFormula, state.enemyHp * hpPointWeight);
     const bonus = (state.enemyHp <= 0) ? 1000 : 0;
 
     return myUnitsRating - enemyUnitsRating + bonus;
 }
 
+const abilitiesIntersect = card1 => card2 => {
+    const card1Abilities = card1.abilities.split('').filter(a => a != '.');
+    const card2Abilities = card2.abilities.split('').filter(a => a != '.');
+    return (card1Abilities.filter(a => card2Abilities.includes(a)).length > 0);
+}
+
 module.exports = {
-    generateAttacks,
     FightSim,
     alive,
     evaluateState,
+    abilitiesIntersect,
 }
