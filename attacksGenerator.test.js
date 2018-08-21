@@ -3,7 +3,13 @@ const {
     alive,
     evaluateState,
     abilitiesIntersect,
+    applyAttack,
+    applyRedCard,
+    applyGreenCard,
+    EMPTY_ABILITY_SLOT,
 } = require('./attacksGenerator');
+
+const EMPTY_ABILITIES = (new Array(6)).fill(EMPTY_ABILITY_SLOT).join('');
 
 const card = (pt, abilities) => {
     const ptParts = pt.split('/');
@@ -11,7 +17,7 @@ const card = (pt, abilities) => {
         name: 'Card ' + pt,
         attack: parseInt(ptParts[0], 10),
         defense: parseInt(ptParts[1], 10),
-        abilities: abilities || '....',
+        abilities: abilities || EMPTY_ABILITIES,
     }
 }
 
@@ -25,7 +31,34 @@ const bake = state => (
     }
 )
 
-describe('Graph tests', () => {
+describe('applyAttack tests', () => {
+    it('правильный расчёт простого боя', () => {
+        const attacker = card('1/3');
+        const target = card('2/2');
+        const result = applyAttack(attacker, target);
+
+        const expectedResult = {
+            attacker: {
+                name: 'Card 1/3',
+                attack: 1,
+                defense: 1,
+                abilities: EMPTY_ABILITIES,
+            },
+            target: {
+                name: 'Card 2/2',
+                attack: 2,
+                defense: 1,
+                abilities: EMPTY_ABILITIES,
+            },
+            excessDamage: 0,
+            excessDamageToUs: 0,
+        }
+
+        expect(result).toEqual(expectedResult);
+    });
+});
+
+describe('FightSim tests', () => {
     it('должен правильно симулировать бой', () => {
         const myField = [card('1/1'), card('1/1')];
         const enemyField = [card('2/1', 'A'), card('2/1', 'B'), card('2/1', 'C')];
@@ -144,7 +177,7 @@ describe('Graph tests', () => {
         const result = sim.simulateFight('1');
 
         expect(result.enemy.filter(alive).length).toEqual(1);
-        expect(result.enemy.filter(alive)[0].abilities).toEqual('.');
+        expect(result.enemy.filter(alive)[0].abilities).toEqual(EMPTY_ABILITY_SLOT);
     });
 
     it('lethal в ward не убивает его', () => {
@@ -154,7 +187,7 @@ describe('Graph tests', () => {
         const result = sim.simulateFight('1');
 
         expect(result.enemy.filter(alive).length).toEqual(1);
-        expect(result.enemy.filter(alive)[0].abilities).toEqual('.');
+        expect(result.enemy.filter(alive)[0].abilities).toEqual(EMPTY_ABILITY_SLOT);
     });
 
     it('breakthrough в ward не проносит урон в игрока', () => {
@@ -164,7 +197,7 @@ describe('Graph tests', () => {
         const result = sim.simulateFight('1');
 
         expect(result.enemy.filter(alive).length).toEqual(1);
-        expect(result.enemy.filter(alive)[0].abilities).toEqual('.');
+        expect(result.enemy.filter(alive)[0].abilities).toEqual(EMPTY_ABILITY_SLOT);
         expect(result.enemyHp).toEqual(10);
     });
 
@@ -199,7 +232,6 @@ describe('Graph tests', () => {
         expect(sim.plans.length).toEqual(13);
     });
 
-
     it('вынос атакующих вместо атаки в игрока', () => {
         const myField = [card('1/1')];
         const enemyField = [card('3/1')];
@@ -211,7 +243,6 @@ describe('Graph tests', () => {
         // expect(chargeValue).toEqual(-1.1999999999999993);
 
         const attackState = bake(sim.simulateFight('1'));
-        // console.debug(attackState);
         const attackValue = evaluateState(attackState);
 
         expect(attackValue).toEqual(0);
@@ -221,19 +252,19 @@ describe('Graph tests', () => {
 
     it('правильно определяет пересечение свойств', () => {
         const c1 = {
-            abilities: '.ABC..',
+            abilities: 'ABC',
         };
         const c2 = {
-            abilities: '...CDE',
+            abilities: 'CDE',
         };
         const c3 = {
-            abilities: 'N...DE',
+            abilities: 'NDE',
         }
 
         expect(abilitiesIntersect(c1)(c2)).toEqual(true);
         expect(abilitiesIntersect(c2)(c3)).toEqual(true);
         expect(abilitiesIntersect(c1)(c3)).toEqual(false);
-    })
+    });
 
     it('прунинг планов учитывает всех защитников', () => {
         const myField = [card('2/1'), card('1/1'), card('1/2')];
@@ -294,7 +325,7 @@ describe('Graph tests', () => {
         expect(sim.bestPlan).toEqual(optimalPlan);
     });
 
-    it.skip('уровни кеширования не влияют на результат симуляции', () => {
+    it('уровни кеширования не влияют на результат симуляции', () => {
         const myField = [card('5/1'), card('5/1'), card('5/1'), card('1/4'), card('1/1'), card('1/1')];
         const enemyField = [card('0/4'), card('0/4'), card('1/1', 'G'), card('1/1', 'G'), card('0/4')];
 
@@ -306,7 +337,7 @@ describe('Graph tests', () => {
 
         expect(simCache0.bestPlan).toEqual(optimalPlan);
 
-        const simCache1 = new FightSim(myField, enemyField);
+/*        const simCache1 = new FightSim(myField, enemyField);
         simCache1.cacheLevel = 1;
         const sim1results = simCache1.plans.map(plan => simCache1.simulateFight(plan));
 
@@ -329,7 +360,7 @@ describe('Graph tests', () => {
         simCache4.cacheLevel = 4;
         simCache4.plans.map(plan => simCache4.simulateFight(plan));
 
-        expect(simCache4.bestPlan).toEqual(optimalPlan);
+        expect(simCache4.bestPlan).toEqual(optimalPlan); */
 
         const simCache5 = new FightSim(myField, enemyField);
         simCache5.cacheLevel = 5;

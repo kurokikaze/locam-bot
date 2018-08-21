@@ -6,6 +6,8 @@ const isHaste = makeIsMethod('C');
 const isTrample = makeIsMethod('B');
 const isWard = makeIsMethod('W');
 
+const EMPTY_ABILITY_SLOT = '-';
+
 function pad(n, width, z) {
   z = z || '0';
   n = n + '';
@@ -28,6 +30,65 @@ function shuffleArray(array) {
         var temp = array[i];
         array[i] = array[j];
         array[j] = temp;
+    }
+}
+
+function applyAttack(attacker, target) {
+    var damageDealtToTarget = attacker.attack;
+
+    if (isWard(target)) {
+        damageDealtToTarget = 0;
+    }
+
+    const excessDamage = isTrample(attacker) ? Math.max(damageDealt - target.defense, 0) : 0;
+    const targetHp = (isDeathtouch(attacker) && damageDealt > 0) ? 0 : target.defense - damageDealtToTarget;
+
+    var damageDealtToAttacker = target.attack;
+    
+    if (isWard(attacker)) {
+        damageDealt = 0;
+    }
+
+    const excessDamageToUs = isTrample(target) ? Math.max(damageDealtToAttacker - attacker.defense, 0) : 0;
+    const attackerHp = (isDeathtouch(target) && damageDealtToUs > 0) ? 0 : attacker.defense - damageDealtToAttacker;
+
+    return {
+        attacker: {
+            ...attacker,
+            defense: attackerHp,
+            abilities: (target.attack > 0) ? attacker.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : attacker.abilities,
+        },
+        target: {
+            ...target,
+            defense: targetHp,
+            abilities: (attacker.attack > 0) ? target.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : target.abilities,
+        },
+        excessDamage,
+        excessDamageToUs
+    };
+}
+
+function applyRedCard(card, target) {
+    const targetAbilities = new Set(target.abilities);
+    const cardAbilities = new Set(card.abilities);
+
+    return {
+        ...target,
+        attack: target.attack + card.attack,
+        defense: target.attack + card.defense,
+        abilities: [...targetAbilities].filter(x => !cardAbilities.has(x)).join(''),
+    }
+}
+
+function applyGreenCard(card, target) {
+    const targetAbilities = new Set(target.abilities);
+    const cardAbilities = new Set(card.abilities);
+
+    return {
+        ...target,
+        attack: target.attack + card.attack,
+        defense: target.attack + card.defense,
+        abilities: new Set([...targetAbilities, ...cardAbilities]).join(''),
     }
 }
 
@@ -216,8 +277,6 @@ class FightSim {
                 const excessDamageToUs = isTrample(target) ? Math.max(damageDealtToUs - attacker.defense, 0) : 0;
                 const attackerHp = (isDeathtouch(target) && damageDealtToUs > 0) ? 0 : attacker.defense - damageDealtToUs;
 
-                // var attackerHp = isDeathtouch(target) ? 0 : attacker.defense - target.attack;
-
                 const newState = {
                     ...state,
                     my: [
@@ -225,7 +284,7 @@ class FightSim {
                         {
                             ...attacker,
                             defense: attackerHp,
-                            abilities: (target.attack > 0) ? attacker.abilities.replace(/W/g, '.') : attacker.abilities,
+                            abilities: (target.attack > 0) ? attacker.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : attacker.abilities,
                         },
                         ...state.my.slice(i + 1),
                     ],
@@ -234,7 +293,7 @@ class FightSim {
                         {
                             ...target,
                             defense: targetHp,
-                            abilities: (attacker.attack > 0) ? target.abilities.replace(/W/g, '.') : target.abilities,
+                            abilities: (attacker.attack > 0) ? target.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : target.abilities,
                         },
                         ...state.enemy.slice(j + 1),
                     ],
@@ -268,8 +327,8 @@ const evaluateState = state => {
 }
 
 const abilitiesIntersect = card1 => card2 => {
-    const card1Abilities = card1.abilities.split('').filter(a => a != '.');
-    const card2Abilities = card2.abilities.split('').filter(a => a != '.');
+    const card1Abilities = card1.abilities.split('');
+    const card2Abilities = card2.abilities.split('');
     return (card1Abilities.filter(a => card2Abilities.includes(a)).length > 0);
 }
 
@@ -278,4 +337,8 @@ module.exports = {
     alive,
     evaluateState,
     abilitiesIntersect,
+    applyAttack,
+    applyRedCard,
+    applyGreenCard,
+    EMPTY_ABILITY_SLOT,
 }
