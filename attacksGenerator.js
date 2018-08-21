@@ -6,7 +6,7 @@ const isHaste = makeIsMethod('C');
 const isTrample = makeIsMethod('B');
 const isWard = makeIsMethod('W');
 
-const EMPTY_ABILITY_SLOT = '-';
+const EMPTY_ABILITY_SLOT = '';
 
 function pad(n, width, z) {
   z = z || '0';
