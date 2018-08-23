@@ -40,8 +40,8 @@ function applyAttack(attacker, target) {
         damageDealtToTarget = 0;
     }
 
-    const excessDamage = isTrample(attacker) ? Math.max(damageDealt - target.defense, 0) : 0;
-    const targetHp = (isDeathtouch(attacker) && damageDealt > 0) ? 0 : target.defense - damageDealtToTarget;
+    const excessDamage = isTrample(attacker) ? Math.max(damageDealtToTarget - target.defense, 0) : 0;
+    const targetHp = (isDeathtouch(attacker) && damageDealtToTarget > 0) ? 0 : target.defense - damageDealtToTarget;
 
     var damageDealtToAttacker = target.attack;
     
@@ -127,10 +127,9 @@ class FightSim {
         this.plans = Array(number).fill(1).map((el, i) => pad(i.toString(base), myUnits));
     }
 
-
     addFullPlans() {
         const unitAttacks = this.myField.map(unit => {
-            this.enemyField.map
+            this.enemyField.map()
         })
     }
 
@@ -174,34 +173,12 @@ class FightSim {
 
         this.positionSkip = 0;
 
-        if (this.stateCache[plan.slice(0, 1)] && this.cacheLevel >= 1) {
-            initialState = this.stateCache[plan.slice(0, 1)];
-            initialPlan = planSteps.slice(1);
-            this.positionSkip = 1;
-        }
-
-        if (this.stateCache[plan.slice(0, 2)] && this.cacheLevel >= 2) {
-            initialState = this.stateCache[plan.slice(0, 2)];
-            initialPlan = planSteps.slice(2);
-            this.positionSkip = 2;
-        }
-
-        if (this.stateCache[plan.slice(0, 3)] && this.cacheLevel >= 3) {
-            initialState = this.stateCache[plan.slice(0, 3)];
-            initialPlan = planSteps.slice(3);
-            this.positionSkip = 3;
-        }
-
-        if (this.stateCache[plan.slice(0, 4)] && this.cacheLevel >= 4) {
-            initialState = this.stateCache[plan.slice(0, 4)];
-            initialPlan = planSteps.slice(4);
-            this.positionSkip = 4;
-        }
-
-        if (this.stateCache[plan.slice(0, 5)] && this.cacheLevel === 5) {
-            initialState = this.stateCache[plan.slice(0, 5)];
-            initialPlan = planSteps.slice(5);
-            this.positionSkip = 5;
+        for (var level = 1; level <= this.cacheLevel; level++) {
+            if (this.stateCache[plan.slice(0, level)]) {
+                initialState = this.stateCache[plan.slice(0, level)];
+                initialPlan = planSteps.slice(level);
+                this.positionSkip = level;
+            }
         }
 
         const finalState = initialPlan.reduce((state, step, index, arr) => {
@@ -226,6 +203,7 @@ class FightSim {
             if (step == 0) {
                 // Если есть провокаторы, атака в игрока не проходит
                 if (defendersPresent) {
+                    /* Break search */
                     arr.splice(0);
                     const newState = {
                         ...state,
@@ -236,7 +214,7 @@ class FightSim {
                 } else {
                     const newState = {
                         ...state,
-                        enemyHp: (state.enemyHp - this.myAttacks[i]),
+                        enemyHp: state.enemyHp - attacker.attack,
                         path,
                     };
                     this.stateCache[path] = newState;
@@ -246,8 +224,9 @@ class FightSim {
             } else {
                 const j = step - 1;
                 const target = state.enemy[j];
-
+                const attackResult = applyAttack(attacker, target);
                 if (defendersPresent && !isDefender(target)) {
+                    /* Break search */
                     arr.splice(0);
                     const newState = {
                         ...state,
@@ -266,45 +245,19 @@ class FightSim {
                     return newState;
                 }
 
-                var damageDealt = attacker.attack;
-
-                if (isWard(target)) {
-                    damageDealt = 0;
-                }
-
-                const excessDamage = isTrample(attacker) ? Math.max(damageDealt - target.defense, 0) : 0;
-                const targetHp = (isDeathtouch(attacker) && damageDealt > 0) ? 0 : target.defense - damageDealt;
-
-                var damageDealtToUs = target.attack;
-                
-                if (isWard(attacker)) {
-                    damageDealt = 0;
-                }
-
-                const excessDamageToUs = isTrample(target) ? Math.max(damageDealtToUs - attacker.defense, 0) : 0;
-                const attackerHp = (isDeathtouch(target) && damageDealtToUs > 0) ? 0 : attacker.defense - damageDealtToUs;
-
                 const newState = {
                     ...state,
                     my: [
                         ...state.my.slice(0, i),
-                        {
-                            ...attacker,
-                            defense: attackerHp,
-                            abilities: (target.attack > 0) ? attacker.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : attacker.abilities,
-                        },
+                        attackResult.attacker,
                         ...state.my.slice(i + 1),
                     ],
                     enemy: [
                         ...state.enemy.slice(0, j),
-                        {
-                            ...target,
-                            defense: targetHp,
-                            abilities: (attacker.attack > 0) ? target.abilities.replace(/W/g, EMPTY_ABILITY_SLOT) : target.abilities,
-                        },
+                        attackResult.target,
                         ...state.enemy.slice(j + 1),
                     ],
-                    enemyHp: state.enemyHp - excessDamage,
+                    enemyHp: state.enemyHp - attackResult.excessDamage,
                     path,
                 };
 
@@ -312,7 +265,9 @@ class FightSim {
                 return newState;
             }
         }, initialState);
+
         const finalScore = evaluateState(bake(finalState));
+
         if (finalScore > this.bestPlanScore) {
             this.bestPlan = plan;
             this.bestPlanScore = finalScore;
