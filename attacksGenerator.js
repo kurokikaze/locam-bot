@@ -127,6 +127,13 @@ class FightSim {
         this.plans = Array(number).fill(1).map((el, i) => pad(i.toString(base), myUnits));
     }
 
+
+    addFullPlans() {
+        const unitAttacks = this.myField.map(unit => {
+            this.enemyField.map
+        })
+    }
+
     prunePlans() {
         var defenderPositions = new Set();
         this.enemyField.forEach((c, i) => {
